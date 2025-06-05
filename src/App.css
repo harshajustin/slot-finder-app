@@ -1,0 +1,94 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem;
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  #root {
+    padding: 2rem;
+  }
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+/* Responsive utility classes */
+.responsive-container {
+  width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (max-width: 576px) {
+  .responsive-padding {
+    padding: 0.75rem !important;
+  }
+  
+  .responsive-card {
+    border-radius: 0.5rem !important;
+    padding: 1rem !important;
+  }
+}
+
+/* Touch-friendly tap targets for mobile */
+@media (max-width: 768px) {
+  button, 
+  [role="button"],
+  .interactive-item {
+    min-height: 44px;
+  }
+}
+
+/* Better calendar experience on mobile */
+@media (max-width: 480px) {
+  .rdp-month {
+    width: 100% !important;
+  }
+  
+  .rdp-cell {
+    padding: 0 !important;
+  }
+  
+  .rdp-button {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 0.875rem !important;
+  }
+}
