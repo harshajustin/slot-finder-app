@@ -713,19 +713,7 @@ const Index = () => {  const [selectedDate, setSelectedDate] = useState<Date | u
         isOpen={showDebugDialog} 
         onClose={() => setShowDebugDialog(false)} 
         bookings={bookings} 
-      />
-
-      {/* Debug Button - Add this for development purposes */}
-      <div className="fixed bottom-5 right-5 z-50">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => setShowDebugDialog(true)}
-          className="bg-white shadow-lg"
-        >
-          Debug Bookings
-        </Button>
-      </div>
+      />      npm update
     </div>
   );
 };
