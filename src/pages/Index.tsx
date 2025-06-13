@@ -4,11 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
 import { CalendarDays, Clock, Users, CheckCircle, ArrowLeft } from 'lucide-react';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useBreakpoint } from '@/hooks/use-mobile';
 import { useSearchParams, Link } from 'react-router-dom';
+import './booking-calendar.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -105,7 +107,17 @@ const Index = () => {
       localStorage.setItem('userDetails', JSON.stringify(userDetails));
     }
   }, [userDetails]);
-
+  // Check if a date has any bookings
+  const hasBookings = (date: Date): boolean => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const slotCounts = bookings[dateStr];
+    
+    if (!slotCounts) return false;
+    
+    // Check if at least one slot has bookings
+    return slotCounts.some(count => count > 0);
+  };
+  
   const getSlotStatus = (slotIndex: number, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const slotCounts = bookings[dateStr] || Array(TIME_SLOTS.length).fill(0);
@@ -409,16 +421,23 @@ const Index = () => {
                       Choose your preferred appointment date
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="px-2 sm:px-6 pb-5 sm:pb-6 flex justify-center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => isBefore(date, startOfDay(new Date()))}
-                      className="rounded-md border shadow-sm bg-white max-w-full"
-                      showOutsideDays={!isMobile}
-                      fixedWeeks
-                    />
+                  <CardContent className="px-2 sm:px-6 pb-5 sm:pb-6 flex justify-center">                    <div className="relative">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        disabled={(date) => isBefore(date, startOfDay(new Date()))}
+                        className="rounded-md border shadow-sm bg-white max-w-full"
+                        showOutsideDays={!isMobile}
+                        fixedWeeks
+                        modifiers={{
+                          booked: (date) => hasBookings(date)
+                        }}
+                        modifiersClassNames={{
+                          booked: "day-with-bookings"
+                        }}
+                      />
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -551,15 +570,22 @@ const Index = () => {
                   <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
                     <div className="flex flex-col items-center sm:items-start">
                       <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">Select Date</h3>
-                      <div className="flex justify-center w-full">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={setSelectedDate}
-                          className="rounded-md border shadow-sm bg-white max-w-full"
-                          showOutsideDays={!isMobile}
-                          fixedWeeks
-                        />
+                      <div className="flex justify-center w-full">                        <div className="relative">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDate}
+                            onSelect={setSelectedDate}
+                            className="rounded-md border shadow-sm bg-white max-w-full"
+                            showOutsideDays={!isMobile}
+                            fixedWeeks
+                            modifiers={{
+                              booked: (date) => hasBookings(date)
+                            }}
+                            modifiersClassNames={{
+                              booked: "day-with-bookings"
+                            }}
+                          />
+                        </div>
                       </div>
                     </div>
                     

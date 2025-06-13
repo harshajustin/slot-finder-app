@@ -1,0 +1,12 @@
+/* Calendar booking indicator dot */
+.day-with-bookings::after {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #3b82f6; /* blue-500 */
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+}
