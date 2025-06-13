@@ -1,14 +1,20 @@
-
 import { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CalendarDays, Clock, Users, CheckCircle } from 'lucide-react';
+import { CalendarDays, Clock, Users, CheckCircle, ArrowLeft } from 'lucide-react';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { useBreakpoint } from '@/hooks/use-mobile';
+import { useSearchParams, Link } from 'react-router-dom';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 
 const TIME_SLOTS = [
   "09:00 AM - 10:00 AM",
@@ -24,12 +30,47 @@ interface Bookings {
   [date: string]: number[];
 }
 
+interface UserDetails {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+const userDetailsSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(10, 'Phone number must be at least 10 digits')
+});
+
 const Index = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [bookings, setBookings] = useState<Bookings>({});
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
+  const [showUserDetailsDialog, setShowUserDetailsDialog] = useState(false);
+  const [useExistingDetails, setUseExistingDetails] = useState(false);
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'book';
+  
+  const handleCloseUserDetailsDialog = (open: boolean) => {
+    if (!open) {
+      // Reset the form when closing the dialog
+      form.reset();      setShowUserDetailsDialog(false);
+    } else {
+      setShowUserDetailsDialog(true);
+    }
+  };
   const { isMobile, isTablet } = useBreakpoint();
+
+  const form = useForm<z.infer<typeof userDetailsSchema>>({
+    resolver: zodResolver(userDetailsSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+    },
+  });
 
   // Load bookings from localStorage on mount
   useEffect(() => {
@@ -41,12 +82,29 @@ const Index = () => {
         console.error('Error loading bookings:', error);
       }
     }
+    
+    // Load user details from localStorage if available
+    const savedUserDetails = localStorage.getItem('userDetails');
+    if (savedUserDetails) {
+      try {
+        setUserDetails(JSON.parse(savedUserDetails));
+      } catch (error) {
+        console.error('Error loading user details:', error);
+      }
+    }
   }, []);
 
   // Save bookings to localStorage whenever bookings change
   useEffect(() => {
     localStorage.setItem('bookings', JSON.stringify(bookings));
   }, [bookings]);
+  
+  // Save user details to localStorage whenever they change
+  useEffect(() => {
+    if (userDetails) {
+      localStorage.setItem('userDetails', JSON.stringify(userDetails));
+    }
+  }, [userDetails]);
 
   const getSlotStatus = (slotIndex: number, date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -95,21 +153,77 @@ const Index = () => {
       return;
     }
     
+    // Set the selected slot and show user details dialog if needed
+    setSelectedSlot(slotIndex);
+    
+    // If we already have user details, ask if they want to use existing details
+    if (userDetails) {
+      setUseExistingDetails(true);
+    } else {
+      // Otherwise, show the dialog to collect user details
+      setShowUserDetailsDialog(true);
+    }
+  };
+
+  const confirmBooking = (details: UserDetails | null = null) => {
+    if (selectedSlot === null || !selectedDate) return;
+    
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    
+    // Save the user details if provided
+    if (details) {
+      setUserDetails(details);
+    }
+    
+    // Update bookings
     setBookings(prev => {
       const newBookings = { ...prev };
       if (!newBookings[dateStr]) {
         newBookings[dateStr] = Array(TIME_SLOTS.length).fill(0);
       }
-      newBookings[dateStr][slotIndex]++;
+      newBookings[dateStr][selectedSlot]++;
       return newBookings;
     });
     
+    // Show confirmation toast
     toast({
       title: "Booking confirmed!",
-      description: `Successfully booked ${TIME_SLOTS[slotIndex]} on ${format(selectedDate, 'PPP')}`,
+      description: `Successfully booked ${TIME_SLOTS[selectedSlot]} on ${format(selectedDate, 'PPP')}`,
     });
+    
+    // Reset state
+    setSelectedSlot(null);
+    setShowUserDetailsDialog(false);
+    setUseExistingDetails(false);
+  };
+    const handleUseExistingDetails = (useExisting: boolean) => {
+    setUseExistingDetails(false);
+    
+    if (useExisting && userDetails) {
+      // Use existing details
+      confirmBooking();
+    } else {
+      // Show the form to collect new details and pre-populate with existing details if available
+      if (userDetails) {
+        form.reset({
+          name: userDetails.name,
+          email: userDetails.email,
+          phone: userDetails.phone,
+        });
+      }
+      setShowUserDetailsDialog(true);
+    }
   };
 
+  const handleUserDetailsSubmit = (data: z.infer<typeof userDetailsSchema>) => {
+    const details = {
+      name: data.name,
+      email: data.email,
+      phone: data.phone
+    };
+    
+    confirmBooking(details);
+  };
   const handleCancelBooking = (slotIndex: number) => {
     if (!selectedDate) return;
     
@@ -163,10 +277,114 @@ const Index = () => {
               Max {MAX_BOOKINGS_PER_SLOT} per slot
             </Badge>
           </div>
+        </div>        {/* User Details Dialog */}
+        <Dialog open={showUserDetailsDialog} onOpenChange={handleCloseUserDetailsDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Complete Your Booking</DialogTitle>
+              <DialogDescription>
+                Please enter your details to confirm your appointment for{' '}
+                {selectedSlot !== null && selectedDate && (
+                  <span className="font-medium">
+                    {TIME_SLOTS[selectedSlot]} on {format(selectedDate, 'EEE, MMM d, yyyy')}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...form}>              <form onSubmit={form.handleSubmit(handleUserDetailsSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your full name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="your.email@example.com" type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your phone number" type="tel" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <DialogFooter className="pt-3">                  <Button
+                    variant="outline"
+                    type="button"
+                    onClick={() => handleCloseUserDetailsDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit">Confirm Booking</Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Use Existing Details Confirmation Dialog */}
+        <Dialog open={useExistingDetails} onOpenChange={() => setUseExistingDetails(false)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Use Existing Details</DialogTitle>
+              <DialogDescription>
+                We found your previous booking details. Would you like to use them for this booking?
+                {userDetails && (
+                  <div className="mt-4 border rounded-md p-4 bg-muted/30">
+                    <div className="grid gap-1">
+                      <p className="text-sm font-medium">Name: {userDetails.name}</p>
+                      <p className="text-sm font-medium">Email: {userDetails.email}</p>
+                      <p className="text-sm font-medium">Phone: {userDetails.phone}</p>
+                    </div>
+                  </div>
+                )}              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center gap-4 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => handleUseExistingDetails(false)}
+              >
+                Enter New Details
+              </Button>
+              <Button 
+                onClick={() => handleUseExistingDetails(true)}
+              >
+                Use These Details
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>        {/* Back to Home link */}
+        <div className="mb-4">
+          <Link to="/" className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 transition-colors">
+            <ArrowLeft className="h-4 w-4" /> Back to Home
+          </Link>
         </div>
 
         <div className="max-w-6xl mx-auto">
-          <Tabs defaultValue="book" className="w-full">
+          <Tabs defaultValue={initialTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-4 sm:mb-8">
               <TabsTrigger value="book" className="flex items-center gap-1 sm:gap-2 text-sm sm:text-base py-1.5 sm:py-2">
                 <CalendarDays className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -271,6 +489,54 @@ const Index = () => {
             </TabsContent>
 
             <TabsContent value="manage" className="space-y-4 sm:space-y-6">
+              {/* User details card */}
+              {userDetails && (
+                <Card className="shadow-lg border-0 bg-white/80 backdrop-blur">
+                  <CardHeader className="px-4 py-5 sm:p-6">
+                    <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                      <Users className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                      Your Details
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                      Personal information used for bookings
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-3 sm:px-6 pb-5 sm:pb-6">
+                    <div className="space-y-3 border rounded-md p-4 bg-blue-50/50">
+                      <div className="grid grid-cols-[100px_1fr] items-center">
+                        <span className="font-medium text-gray-700">Name:</span>
+                        <span>{userDetails.name}</span>
+                      </div>
+                      <div className="grid grid-cols-[100px_1fr] items-center">
+                        <span className="font-medium text-gray-700">Email:</span>
+                        <span>{userDetails.email}</span>
+                      </div>
+                      <div className="grid grid-cols-[100px_1fr] items-center">
+                        <span className="font-medium text-gray-700">Phone:</span>
+                        <span>{userDetails.phone}</span>
+                      </div>
+                      <div className="pt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            form.reset({
+                              name: userDetails.name,
+                              email: userDetails.email,
+                              phone: userDetails.phone,
+                            });
+                            setShowUserDetailsDialog(true);
+                          }}
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50 text-xs sm:text-sm"
+                        >
+                          Edit Details
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               <Card className="shadow-lg border-0 bg-white/80 backdrop-blur">
                 <CardHeader className="px-4 py-5 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
@@ -339,6 +605,70 @@ const Index = () => {
           </Tabs>
         </div>
       </div>
+
+      {/* User Details Dialog */}
+      <Dialog open={showUserDetailsDialog} onOpenChange={setShowUserDetailsDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+            <DialogDescription>
+              {useExistingDetails 
+                ? 'We found your details. Do you want to use the existing details for booking?' 
+                : 'Please enter your details to proceed with the booking.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleUserDetailsSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter your phone number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <Button type="submit" className="w-full">
+                  Submit
+                </Button>
+              </form>
+            </Form>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
