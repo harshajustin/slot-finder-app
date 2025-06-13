@@ -1,12 +1,32 @@
 /* Calendar booking indicator dot */
-.day-with-bookings::after {
+/* Use a very targeted selector for the shadcn calendar implementation */
+td:has(> div > button[data-booked]) > div > button::after,
+td:has(> div > button.day-with-bookings) > div > button::after,
+button[data-booked]::after,
+button.day-with-bookings::after {
   content: '';
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background-color: #3b82f6; /* blue-500 */
   bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
+  z-index: 10;
+}
+
+/* Use !important to override any conflicting styles */
+[aria-selected="false"].day-with-bookings button::after,
+[aria-selected="false"][data-booked] button::after {
+  content: '' !important;
+  position: absolute !important;
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background-color: #3b82f6 !important; /* blue-500 */
+  bottom: 2px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  z-index: 10 !important;
 }

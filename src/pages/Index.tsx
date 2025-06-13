@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { DayContent, DayContentProps } from 'react-day-picker';
 import { CalendarDays, Clock, Users, CheckCircle, ArrowLeft } from 'lucide-react';
 import { format, isToday, isBefore, startOfDay } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -13,6 +14,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import './booking-calendar.css';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { DebugDialog } from '@/components/debug-dialog';
 import { Input } from '@/components/ui/input';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -44,14 +46,14 @@ const userDetailsSchema = z.object({
   phone: z.string().min(10, 'Phone number must be at least 10 digits')
 });
 
-const Index = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+const Index = () => {  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [bookings, setBookings] = useState<Bookings>({});
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [showUserDetailsDialog, setShowUserDetailsDialog] = useState(false);
   const [useExistingDetails, setUseExistingDetails] = useState(false);
+  const [showDebugDialog, setShowDebugDialog] = useState(false);
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') || 'book';
   
@@ -106,8 +108,7 @@ const Index = () => {
     if (userDetails) {
       localStorage.setItem('userDetails', JSON.stringify(userDetails));
     }
-  }, [userDetails]);
-  // Check if a date has any bookings
+  }, [userDetails]);  // Check if a date has any bookings
   const hasBookings = (date: Date): boolean => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const slotCounts = bookings[dateStr];
@@ -116,6 +117,27 @@ const Index = () => {
     
     // Check if at least one slot has bookings
     return slotCounts.some(count => count > 0);
+  };
+  
+  // Custom day component that shows a dot for days with bookings
+  function BookedDayContent(props: DayContentProps) {
+    const { date } = props;
+    const isDateBooked = hasBookings(date);
+    
+    return (
+      <div className="relative">
+        <DayContent {...props} />
+        {isDateBooked && (
+          <div 
+            className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 bg-blue-500 rounded-full"
+            style={{ 
+              bottom: '2px',
+              zIndex: 10
+            }}
+          />
+        )}
+      </div>
+    );
   };
   
   const getSlotStatus = (slotIndex: number, date: Date) => {
@@ -421,8 +443,7 @@ const Index = () => {
                       Choose your preferred appointment date
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="px-2 sm:px-6 pb-5 sm:pb-6 flex justify-center">                    <div className="relative">
-                      <Calendar
+                  <CardContent className="px-2 sm:px-6 pb-5 sm:pb-6 flex justify-center">                    <div className="relative">                      <Calendar
                         mode="single"
                         selected={selectedDate}
                         onSelect={setSelectedDate}
@@ -430,11 +451,8 @@ const Index = () => {
                         className="rounded-md border shadow-sm bg-white max-w-full"
                         showOutsideDays={!isMobile}
                         fixedWeeks
-                        modifiers={{
-                          booked: (date) => hasBookings(date)
-                        }}
-                        modifiersClassNames={{
-                          booked: "day-with-bookings"
+                        components={{
+                          DayContent: BookedDayContent
                         }}
                       />
                     </div>
@@ -569,8 +587,7 @@ const Index = () => {
                 <CardContent className="px-3 sm:px-6 pb-5 sm:pb-6">
                   <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
                     <div className="flex flex-col items-center sm:items-start">
-                      <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">Select Date</h3>
-                      <div className="flex justify-center w-full">                        <div className="relative">
+                      <h3 className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">Select Date</h3>                      <div className="flex justify-center w-full">                        <div className="relative">
                           <Calendar
                             mode="single"
                             selected={selectedDate}
@@ -578,11 +595,8 @@ const Index = () => {
                             className="rounded-md border shadow-sm bg-white max-w-full"
                             showOutsideDays={!isMobile}
                             fixedWeeks
-                            modifiers={{
-                              booked: (date) => hasBookings(date)
-                            }}
-                            modifiersClassNames={{
-                              booked: "day-with-bookings"
+                            components={{
+                              DayContent: BookedDayContent
                             }}
                           />
                         </div>
@@ -685,9 +699,7 @@ const Index = () => {
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-
-                <Button type="submit" className="w-full">
+                />                <Button type="submit" className="w-full">
                   Submit
                 </Button>
               </form>
@@ -695,6 +707,25 @@ const Index = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Debug Dialog for development */}
+      <DebugDialog 
+        isOpen={showDebugDialog} 
+        onClose={() => setShowDebugDialog(false)} 
+        bookings={bookings} 
+      />
+
+      {/* Debug Button - Add this for development purposes */}
+      <div className="fixed bottom-5 right-5 z-50">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setShowDebugDialog(true)}
+          className="bg-white shadow-lg"
+        >
+          Debug Bookings
+        </Button>
+      </div>
     </div>
   );
 };
